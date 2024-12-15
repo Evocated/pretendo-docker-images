@@ -1,0 +1,63 @@
+name: Build and Export Docker Images for ARM64
+
+on:
+  push:
+    paths-ignore:
+      - "docs/**"
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      TERM: xterm
+
+    steps:
+      # Checkout the code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      # Set up Docker Buildx for multi-architecture support
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Set up multi-platform build environment (specifically ARM64)
+      - name: Set up multi-platform build
+        run: |
+          docker buildx create --use
+
+      # Build Docker image for ARM64 and export to tar
+      - name: Build ARM64 Docker image and export as tar
+        run: |
+          # Build the image for ARM64 architecture
+          docker buildx build \
+            --platform linux/arm64 \
+            -t myusername/myapp:arm64-${{ github.sha }} \
+            .
+
+          # Export the image to a tar file
+          docker save myusername/myapp:arm64-${{ github.sha }} -o images/myapp-arm64-${{ github.sha }}.tar
+
+      # Commit the exported tar files to the main branch
+      - name: Commit and push tar files to the main branch
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          
+          # Create images/ directory if it doesn't exist
+          mkdir -p images
+
+          # Move the tar file to the images directory
+          mv images/myapp-arm64-${{ github.sha }}.tar images/
+
+          # Add and commit the tar files
+          git add images/
+          git commit -m "Add ARM64 Docker image tar for commit ${{ github.sha }}"
+
+          # Push the changes to the main branch
+          git push origin main
